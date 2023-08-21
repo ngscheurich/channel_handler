@@ -73,6 +73,14 @@ defmodule ChannelHandler.Extension do
           @event event
           ChannelHandler.Extension.build_event(@event, @plugs)
 
+        %ChannelHandler.Dsl.Info{} = info ->
+          @info info
+          ChannelHandler.Extension.build_info(@info, @plugs)
+
+        %ChannelHandler.Dsl.HandleMessage{} = handle_message ->
+          @handle_message handle_message
+          ChannelHandler.Extension.build_handle_message(@handle_message, @plugs)
+
         %ChannelHandler.Dsl.Handle{} = handle ->
           @handle handle
           ChannelHandler.Extension.build_handle(@handle, @plugs)
@@ -143,6 +151,59 @@ defmodule ChannelHandler.Extension do
           raise ArgumentError, "channels using splat patterns must end with *"
       end
     end
+  end
+
+  defmacro build_info(info, plugs) do
+    quote location: :keep, generated: true do
+      @message unquote(info).message
+      def handle_info(@message, socket) do
+        ChannelHandler.Extension.perform_info(unquote(info), socket, unquote(plugs))
+      end
+    end
+  end
+
+  def perform_info(info, socket, plugs) do
+    context =
+      ChannelHandler.Extension.build_context(
+        event: info.message,
+        full_event: info.message,
+        action: info.function
+      )
+
+    module_plugs =
+      info.module.__info__(:attributes)
+      |> Keyword.get_values(:plugs)
+      |> List.flatten()
+
+    with {:cont, socket, _payload, context} <-
+           ChannelHandler.Extension.process_plugs(
+             plugs ++ module_plugs,
+             socket,
+             %{},
+             context
+           ) do
+      apply(info.module, info.function, [info.message, context, socket])
+    end
+  end
+
+  defmacro build_handle_message(handle_message, _plugs) do
+    quote location: :keep, generated: true do
+      @message unquote(handle_message).message
+      def handle_info(@message, socket) do
+        ChannelHandler.Extension.perform_handle_message(unquote(handle_message), socket)
+      end
+    end
+  end
+
+  def perform_handle_message(handle_message, socket) do
+    context =
+      ChannelHandler.Extension.build_context(
+        event: handle_message.message,
+        full_event: handle_message.message,
+        action: handle_message.function
+      )
+
+    apply(handle_message.function, [context, socket])
   end
 
   def perform_event(event_name, prefix, payload, socket, event, plugs) do

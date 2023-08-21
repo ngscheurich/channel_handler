@@ -2,6 +2,7 @@ defmodule ChannelHandler.Context do
   @type t :: %__MODULE__{
           bindings: map,
           action: atom() | nil,
+          full_event: String.t(),
           event: String.t()
         }
   defstruct [:action, :full_event, :event, bindings: %{}]

@@ -10,8 +10,12 @@ defmodule ChannelHandler.RouterTest do
       event("event", ChannelHandler.RouterTest.TestHandler, :event_fun)
       event("catchall_event:*", ChannelHandler.RouterTest.TestHandler, :event_fun_catchall)
 
+      info(:info, ChannelHandler.RouterTest.TestHandler, :info_fun)
+
       delegate("delegate", ChannelHandler.RouterTest.TestHandler)
       delegate("plug_delegate:", ChannelHandler.RouterTest.TestHandler)
+
+      info({:info, :delegate}, ChannelHandler.RouterTest.TestHandler)
 
       handle("handler", fn _payload, context, _socket ->
         assert %Context{} = context
@@ -24,6 +28,12 @@ defmodule ChannelHandler.RouterTest do
         assert event == "handler"
         assert context.event == "catchall:handler"
         :catchall_handler
+      end)
+
+      handle_message(:info_handler, fn context, _socket ->
+        assert %Context{} = context
+        assert context.event == :info_handler
+        :info_handler
       end)
 
       scope "scoped:" do
@@ -62,6 +72,7 @@ defmodule ChannelHandler.RouterTest do
       scope do
         plug(&noop_plug/4)
 
+
         handle("no_scope", fn _payload, context, _socket ->
           assert context.event == "no_scope"
           assert %Context{} = context
@@ -77,6 +88,8 @@ defmodule ChannelHandler.RouterTest do
 
         {:cont, socket, payload, context}
       end
+
+      info(:with_plug_info, ChannelHandler.RouterTest.WithPlugHandler, :info_fun)
     end
 
     defmodule TestHandler do
@@ -97,6 +110,18 @@ defmodule ChannelHandler.RouterTest do
         assert event == "event_name"
         assert context.event == "catchall_event:event_name"
         :event_catchall
+      end
+
+      def info_fun(message, context, _socket) do
+        assert %Context{} = context
+        assert message == :info
+        :info
+      end
+
+      def handle_info(message, context, _socket) do
+        assert %Context{} = context
+        assert message == {:info, :delegate}
+        :info_delegated
       end
 
       def handle_in("event", _payload, context, _socket) do
@@ -165,6 +190,12 @@ defmodule ChannelHandler.RouterTest do
         :with_plug_event_catchall
       end
 
+      def info_fun(_message, context, _socket) do
+        assert %Context{} = context
+        assert context.event == "with_plug:info"
+        :with_plug_info
+      end
+
       def handle_in(event, _payload, context, _socket) do
         assert %Context{} = context
         assert context.event == event
@@ -197,6 +228,10 @@ defmodule ChannelHandler.RouterTest do
     assert TestRouter.handle_in("delegate", %{}, :socket) == :delegate
     assert TestRouter.handle_in("plug_delegate:event", %{}, :socket) == :delegate_plug
     assert_receive :plug_called
+
+    assert TestRouter.handle_info(:info, :socket) == :info
+    assert TestRouter.handle_info({:info, :delegate}, :socket) == :info_delegated
+    assert TestRouter.handle_info(:info_handler, :socket) == :info_handler
 
     assert TestRouter.handle_in("handler", %{}, :socket) == :handler
 

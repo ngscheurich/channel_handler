@@ -19,6 +19,16 @@ defmodule ChannelHandler.Dsl do
     defstruct [:name, :module, :function]
   end
 
+  defmodule Info do
+    @moduledoc false
+    defstruct [:message, :module, :function]
+  end
+
+  defmodule HandleMessage do
+    @moduledoc false
+    defstruct [:message, :function]
+  end
+
   defmodule Plug do
     @moduledoc false
     defstruct [:plug, :options]
@@ -54,6 +64,40 @@ defmodule ChannelHandler.Dsl do
       function: [type: :atom, required: true]
     ],
     modules: [:module]
+  }
+
+  @info %Spark.Dsl.Entity{
+    name: :info,
+    target: Info,
+    args: [:message, :module, {:optional, :function, :handle_info}],
+    schema: [
+      message: [type: :any, required: true],
+      module: [type: :atom, required: true],
+      function: [type: :atom, required: true]
+    ],
+    modules: [:module]
+  }
+
+  @handle_message %Spark.Dsl.Entity{
+    name: :handle_message,
+    describe: """
+    Defines a handler for the `message`. `function` must be an arity 2
+    function taking the message, context and socket.
+
+    #### Example
+
+        handle_message {:created, post}, fn _context, socket ->
+          Phoenix.Channel.push(socket, "posts", post)
+
+          {:noreply, socket}
+        end
+    """,
+    target: HandleMessage,
+    args: [:message, :function],
+    schema: [
+      message: [type: :any, required: true],
+      function: [type: {:fun, 2}, required: true]
+    ]
   }
 
   @delegate %Spark.Dsl.Entity{
@@ -187,6 +231,8 @@ defmodule ChannelHandler.Dsl do
       @event,
       @delegate,
       @handle,
+      @info,
+      @handle_message,
       @scope
     ]
   }
